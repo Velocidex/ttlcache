@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	ttlcache "github.com/ReneKroon/ttlcache/v2"
+	ttlcache "github.com/Velocidex/ttlcache/v2"
 )
 
 func BenchmarkCacheSetWithoutTTL(b *testing.B) {

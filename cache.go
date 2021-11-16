@@ -371,6 +371,24 @@ func (cache *Cache) SetLoaderFunction(loader LoaderFunction) {
 	cache.loaderFunction = loader
 }
 
+// Flush all items and wait for them to complete.
+func (cache *Cache) Flush() {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+
+	for _, item := range cache.items {
+		cache.metrics.Evicted++
+		if cache.expireCallback != nil {
+			cache.expireCallback(item.key, item.data)
+		}
+		if cache.expireReasonCallback != nil {
+			cache.expireReasonCallback(item.key, Removed, item.data)
+		}
+		cache.priorityQueue.remove(item)
+		delete(cache.items, item.key)
+	}
+}
+
 // Purge will remove all entries
 func (cache *Cache) Purge() error {
 	cache.mutex.Lock()
