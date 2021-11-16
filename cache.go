@@ -377,12 +377,8 @@ func (cache *Cache) Flush() {
 	defer cache.mutex.Unlock()
 
 	for _, item := range cache.items {
-		cache.metrics.Evicted++
 		if cache.expireCallback != nil {
 			cache.expireCallback(item.key, item.data)
-		}
-		if cache.expireReasonCallback != nil {
-			cache.expireReasonCallback(item.key, Removed, item.data)
 		}
 		cache.priorityQueue.remove(item)
 		delete(cache.items, item.key)
