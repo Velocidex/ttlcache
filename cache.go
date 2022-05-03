@@ -163,6 +163,15 @@ func (cache *Cache) cleanjob() {
 	}
 }
 
+func (cache *Cache) Walk(fn func(key string, data interface{})) {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+
+	for k, item := range cache.items {
+		fn(k, item.data)
+	}
+}
+
 // Close calls Purge after stopping the goroutine that does ttl checking, for a clean shutdown.
 // The cache is no longer cleaning up after the first call to Close, repeated calls are safe and return ErrClosed.
 func (cache *Cache) Close() error {
