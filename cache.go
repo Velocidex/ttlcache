@@ -582,7 +582,9 @@ func NewCache() *Cache {
 func (cache *Cache) GetMetrics() Metrics {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
-	return cache.metrics
+	result := cache.metrics
+	result.Size = int64(len(cache.items))
+	return result
 }
 
 // Touch resets the TTL of the key when it exists, returns ErrNotFound if the key is not present.
