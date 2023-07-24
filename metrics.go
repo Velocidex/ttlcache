@@ -12,4 +12,6 @@ type Metrics struct {
 	Misses int64
 	// items removed from the cache in any way
 	Evicted int64
+
+	Size int64
 }
