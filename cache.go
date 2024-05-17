@@ -1,10 +1,15 @@
 package ttlcache
 
 import (
+	"errors"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/singleflight"
+)
+
+var (
+	NoExpireError = errors.New("NoExpireError")
 )
 
 // CheckExpireCallback is used as a callback for an external check on item expiration
@@ -12,10 +17,10 @@ type CheckExpireCallback func(key string, value interface{}) bool
 
 // ExpireCallback is used as a callback on item expiration or when notifying of an item new to the cache
 // Note that ExpireReasonCallback will be the successor of this function in the next major release.
-type ExpireCallback func(key string, value interface{})
+type ExpireCallback func(key string, value interface{}) error
 
 // ExpireReasonCallback is used as a callback on item expiration with extra information why the item expired.
-type ExpireReasonCallback func(key string, reason EvictionReason, value interface{})
+type ExpireReasonCallback func(key string, reason EvictionReason, value interface{}) error
 
 // LoaderFunction can be supplied to retrieve an item where a cache miss occurs. Supply an item specific ttl or Duration.Zero
 type LoaderFunction func(key string) (data interface{}, ttl time.Duration, err error)
@@ -172,18 +177,29 @@ func (cache *Cache) startExpirationProcessing() {
 	}
 }
 
-func (cache *Cache) checkExpirationCallback(item *item, reason EvictionReason) {
+func (cache *Cache) checkExpirationCallback(item *item, reason EvictionReason) error {
 	if cache.expireCallback != nil {
-		go cache.expireCallback(item.key, item.data)
+		err := cache.expireCallback(item.key, item.data)
+		if err != nil {
+			return err
+		}
 	}
 	if cache.expireReasonCallback != nil {
-		go cache.expireReasonCallback(item.key, reason, item.data)
+		err := cache.expireReasonCallback(item.key, reason, item.data)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (cache *Cache) removeItem(item *item, reason EvictionReason) {
 	cache.metrics.Evicted++
-	cache.checkExpirationCallback(item, reason)
+	err := cache.checkExpirationCallback(item, reason)
+	if err == NoExpireError {
+		item.touch()
+		return
+	}
 	cache.priorityQueue.remove(item)
 	delete(cache.items, item.key)
 }
@@ -525,10 +541,18 @@ func (cache *Cache) Flush() {
 	for _, item := range cache.items {
 		cache.metrics.Evicted++
 		if cache.expireCallback != nil {
-			cache.expireCallback(item.key, item.data)
+			err := cache.expireCallback(item.key, item.data)
+			if err == NoExpireError {
+				item.touch()
+				continue
+			}
 		}
 		if cache.expireReasonCallback != nil {
-			cache.expireReasonCallback(item.key, Removed, item.data)
+			err := cache.expireReasonCallback(item.key, Removed, item.data)
+			if err == NoExpireError {
+				item.touch()
+				continue
+			}
 		}
 		cache.priorityQueue.remove(item)
 		delete(cache.items, item.key)
