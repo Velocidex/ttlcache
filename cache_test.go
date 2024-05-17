@@ -154,10 +154,11 @@ func TestCache_textExpirationReasons(t *testing.T) {
 	cache := NewCache()
 
 	var reason EvictionReason
-	var sync = make(chan struct{})
-	expirationReason := func(key string, evReason EvictionReason, value interface{}) {
+	var sync = make(chan struct{}, 10)
+	expirationReason := func(key string, evReason EvictionReason, value interface{}) error {
 		reason = evReason
 		sync <- struct{}{}
+		return nil
 	}
 	cache.SetExpirationReasonCallback(expirationReason)
 
@@ -197,10 +198,11 @@ func TestCache_TestTouch(t *testing.T) {
 	lock.Unlock()
 
 	cache.SkipTTLExtensionOnHit(true)
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		lock.Lock()
 		defer lock.Unlock()
 		expired = true
+		return nil
 	})
 
 	cache.SetWithTTL("key", "data", time.Millisecond*900)
@@ -297,10 +299,12 @@ func TestCache_TestRemovalTriggersCallback(t *testing.T) {
 	cache := NewCache()
 	defer cache.Close()
 
-	var sync = make(chan struct{})
-	expiration := func(key string, data interface{}) {
+	var sync = make(chan struct{}, 10)
+	expiration := func(key string, data interface{}) error {
 
 		sync <- struct{}{}
+
+		return nil
 	}
 	cache.SetExpirationCallback(expiration)
 
@@ -391,13 +395,14 @@ func TestCache_ExpirationOnClose(t *testing.T) {
 	t.Parallel()
 	cache := NewCache()
 
-	success := make(chan struct{})
+	success := make(chan struct{}, 10)
 	defer close(success)
 
 	cache.SetTTL(time.Hour * 100)
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		t.Logf("%s\t%v", key, value)
 		success <- struct{}{}
+		return nil
 	})
 	cache.Set("1", 1)
 	cache.Set("2", 1)
@@ -424,8 +429,9 @@ func TestCache_ModifyAfterClose(t *testing.T) {
 	cache := NewCache()
 
 	cache.SetTTL(time.Hour * 100)
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		t.Logf("%s\t%v", key, value)
+		return nil
 	})
 	cache.Set("1", 1)
 	cache.Set("2", 1)
@@ -475,7 +481,6 @@ func TestCache_MultipleCloseCalls(t *testing.T) {
 }
 
 // test for Feature request in issue #12
-//
 func TestCache_SkipTtlExtensionOnHit(t *testing.T) {
 	t.Parallel()
 
@@ -642,9 +647,10 @@ func TestCache_SetExpirationCallback(t *testing.T) {
 
 	ch := make(chan struct{}, 1024)
 	cache.SetTTL(time.Second * 1)
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		t.Logf("This key(%s) has expired\n", key)
 		ch <- struct{}{}
+		return nil
 	})
 	for i := 0; i < 1024; i++ {
 		cache.Set(fmt.Sprintf("item_%d", i), A{})
@@ -683,8 +689,9 @@ func TestRemovalWithTtlDoesNotPanic(t *testing.T) {
 	cache := NewCache()
 	defer cache.Close()
 
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		t.Logf("This key(%s) has expired\n", key)
+		return nil
 	})
 
 	cache.SetWithTTL("keyWithTTL", "value", time.Duration(2*time.Second))
@@ -767,8 +774,9 @@ func TestCacheMixedExpirations(t *testing.T) {
 	cache := NewCache()
 	defer cache.Close()
 
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		t.Logf("expired: %s", key)
+		return nil
 	})
 	cache.Set("key_1", "value")
 	cache.SetTTL(time.Duration(100 * time.Millisecond))
@@ -906,10 +914,11 @@ func TestCacheExpirationCallbackFunction(t *testing.T) {
 	defer cache.Close()
 
 	cache.SetTTL(time.Duration(500 * time.Millisecond))
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		lock.Lock()
 		defer lock.Unlock()
 		expiredCount = expiredCount + 1
+		return nil
 	})
 	cache.SetWithTTL("key", "value", time.Duration(1000*time.Millisecond))
 	cache.Set("key_2", "value")
@@ -939,10 +948,11 @@ func TestCacheCheckExpirationCallbackFunction(t *testing.T) {
 		}
 		return false
 	})
-	cache.SetExpirationCallback(func(key string, value interface{}) {
+	cache.SetExpirationCallback(func(key string, value interface{}) error {
 		lock.Lock()
 		expiredCount = expiredCount + 1
 		lock.Unlock()
+		return nil
 	})
 	cache.Set("key", "value")
 	cache.Set("key3", "value")
@@ -963,8 +973,9 @@ func TestCacheNewItemCallbackFunction(t *testing.T) {
 	defer cache.Close()
 
 	cache.SetTTL(time.Duration(50 * time.Millisecond))
-	cache.SetNewItemCallback(func(key string, value interface{}) {
+	cache.SetNewItemCallback(func(key string, value interface{}) error {
 		newItemCount = newItemCount + 1
+		return nil
 	})
 	cache.Set("key", "value")
 	cache.Set("key2", "value")
